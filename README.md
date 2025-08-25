@@ -1,105 +1,113 @@
-Secret Min Bid Auction — Private FHE Auction on Zama FHEVM (Sepolia) 🛡️🔒
+# Secret Min Bid Auction — Private FHE Auction on Zama FHEVM (Sepolia) 🛡️🔒
 
-TL;DR: Lowest bid wins, bids stay private. Encryption & comparisons happen on-chain with Zama FHEVM; results are revealed via publicDecrypt / userDecrypt.
-Frontend is a single index.html (Ethers v6 + Zama Relayer SDK). Contract is SecretMinBidAuction.sol (TFHE euint64/ebool).
+A single-page dApp + Solidity contract that runs a **privacy-preserving “lowest bid wins” auction**.
+Bids are encrypted client-side and **compared on-chain** using Zama’s **FHEVM**; results are revealed via **publicDecrypt** (global minimum) and **userDecrypt** (per-user win flag).
 
-✨ Features
+> **Frontend:** `index.html` (Ethers v6 + Zama Relayer SDK)
+> **Contract:** `contracts/SecretMinBidAuction.sol` (TFHE `euint64` / `ebool`)
 
-Private bids: encrypted in the browser via Relayer SDK → contract only receives handle + proof.
+---
 
-On-chain minimum: encrypted running minimum using TFHE.lt + TFHE.cmux.
+## ✨ Features
 
-Owner flow: close bidding → publish results.
+* 🔐 **Private bids** — the contract only receives a **handle + proof** (no plaintext).
+* 🧮 **On-chain minimum** — encrypted running minimum maintained with `TFHE.lt` + `TFHE.cmux`.
+* 👑 **Owner flow** — close bidding → publish results.
+* 🔦 **Two kinds of reveal**
 
-Two ways to reveal:
+  * **Public minimum**: anyone can decrypt the minimal bid via `publicDecrypt`.
+  * **Per-user win flag**: each bidder gets an `ebool` handle decryptable **only** by them via `userDecrypt`.
+* 🖥️ **Polished SPA** — statuses, loading/encryption effects, simple logs.
 
-Public minimum (anyone can publicDecrypt the min handle).
+---
 
-Per-user win flag (each bidder gets a handle of ebool decryptable only by them via userDecrypt).
+## 🧰 Tech Stack
 
-Smooth UI/UX: single-page app with statuses, loading/encryption effects, and guardrails.
+* **Solidity** `^0.8.20`
+* **Zama FHEVM (TFHE)**: `fhevm/lib/TFHE.sol`
+* **Ethers** `6.15.0` (ESM via CDN)
+* **Relayer SDK JS** `0.1.2` (via CDN)
+* **Network:** Sepolia `11155111`
+* **Relayer:** `https://relayer.testnet.zama.cloud`
+* **KMS (Sepolia):** `0x1364cBBf2cDF5032C47d8226a6f6FBD2AFCDacAC`
 
-🧠 How it works
-Browser (MetaMask + Relayer SDK)      Smart Contract (Zama FHEVM)
-----------------------------------    ----------------------------------------
-bid -> encrypt -> handle/proof  --->  bid(handle, proof)
-                                      - import encrypted bid
-                                      - keep encrypted MIN with TFHE.lt/cmux
-                                      - mark sender as participated
+> Update these in `index.html` to your deployment:
+>
+> ```js
+> const CONTRACT_ADDRESS = "0x2f5dB41809890eceaE6570e61fdE336F3C783c7E"; // example
+> const KMS_ADDRESS      = "0x1364cBBf2cDF5032C47d8226a6f6FBD2AFCDacAC"; // Zama Sepolia KMS
+> const RELAYER_URL      = "https://relayer.testnet.zama.cloud";
+> ```
 
-owner: closeBidding()                 // stop new bids
-owner: publishResults()               // expose min handle (publicDecrypt)
-                                      // seal per-user win flags (userDecrypt)
+---
 
-user: getMyWinFlagHandle()            // handle(ebool) -> userDecrypt via EIP-712
+## 📦 Quick Start
 
-🧰 Tech stack
+### Prerequisites
 
-Solidity ^0.8.20
+* **Node.js** 18+
+* **MetaMask** with **Sepolia** and some test ETH
+* A dev server that sets COOP/COEP headers (for WASM workers)
 
-Zama FHEVM (TFHE): fhevm/lib/TFHE.sol
+### Install
 
-Ethers 6.15.0 (ESM via CDN)
-
-Relayer SDK JS 0.1.2 (via CDN)
-
-Network: Sepolia 11155111
-
-Relayer: https://relayer.testnet.zama.cloud
-
-KMS (Sepolia): 0x1364cBBf2cDF5032C47d8226a6f6FBD2AFCDacAC
-
-Update constants in index.html:
-CONTRACT_ADDRESS, KMS_ADDRESS, RELAYER_URL.
-
-📁 Repository layout (high level)
-index.html                      # the entire frontend
-contracts/SecretMinBidAuction.sol
-server.js                       # simple local server with COOP/COEP headers (optional)
-scripts/, tasks/, test/         # common Hardhat-style helpers (optional)
-package.json, tsconfig.json
-
-
-Lots of crypto/hash/EC libs in node_modules is expected (Ethers + Relayer SDK).
-
-🚀 Quick start
-0) Prerequisites
-
-Node 18+
-
-MetaMask with Sepolia and a bit of test ETH
-
-(Recommended) serve with COOP/COEP headers (WASM + workers need cross-origin isolation)
-
-1) Deploy the contract (Hardhat example)
+```bash
 npm i
+```
+
+### Compile & (optional) Deploy the Contract (Hardhat)
+
+```bash
 npx hardhat compile
+
+# Example: deploy to Sepolia
 npx hardhat run scripts/deploy.ts --network sepolia
-# copy deployed address -> set CONTRACT_ADDRESS in index.html
+# Take the deployed address and set CONTRACT_ADDRESS in index.html
+```
 
-2) Serve the frontend
+### Serve the Frontend (COOP/COEP)
 
-Why a server? WebAssembly workers generally require COOP/COEP headers. Opening the file directly may fail.
+Opening `index.html` directly may fail due to WASM worker isolation. Use the included server:
 
-node server.js   # serves with the right headers
+```bash
+node server.js
 # open http://localhost:3000
+```
 
+*(Any dev server is fine if it sets `Cross-Origin-Opener-Policy: same-origin`
+and `Cross-Origin-Embedder-Policy: require-corp`.)*
 
-(Or use any dev server you prefer; just ensure it sets Cross-Origin-Opener-Policy: same-origin and Cross-Origin-Embedder-Policy: require-corp.)
+### Use the dApp
 
-3) Use the dApp
+1. Click **Connect** → switch to **Sepolia** if prompted.
+2. Enter **Bid Amount** (positive integer) → **PLACE BID**.
+3. Owner clicks **Close Bidding** → **Publish Results**.
+4. Everyone clicks **Get Win Status** → per-user decryption via EIP-712 signature. 🎉
 
-Click Connect → switch to Sepolia if prompted.
+---
 
-Enter Bid Amount (positive integer) → PLACE BID.
+## 📁 Project Structure (key files)
 
-Owner clicks Close Bidding → Publish Results.
+```
+.
+├─ index.html                      # full single-page frontend (Ethers + Relayer SDK)
+├─ contracts/
+│  └─ SecretMinBidAuction.sol      # main FHE auction contract
+├─ server.js                       # simple server with COOP/COEP headers
+├─ scripts/, tasks/, test/         # typical Hardhat-style helpers (optional)
+├─ package.json
+└─ tsconfig.json
+```
 
-Everyone clicks Get Win Status → per-user decryption (EIP-712 signature in MetaMask). 🎉
+> The large crypto/hash/EC dependency tree in `node_modules` is expected (Ethers + Relayer SDK).
 
-🔌 Contract API (current)
+---
+
+## 📜 Contract API (summary)
+
+```solidity
 // public state
-string  public version;              // e.g. "SecretMinBidAuction/1.0.0-sepolia"
+string  public version;              // "SecretMinBidAuction/1.0.0-sepolia"
 address public owner;
 bool    public biddingOpen;          // true until closed
 bool    public minPublished;         // has public min handle been published?
@@ -116,19 +124,41 @@ function getWinFlagHandle(address user) external view returns (bytes32);
 function bid(bytes32 bidExt, bytes calldata proof) external;
 function closeBidding() external;            // onlyOwner
 function publishResults() external;          // onlyOwner
+```
 
-🖼️ Frontend flow (code snippets)
+---
 
-Encrypt & submit bid
+## 🧠 How It Works
 
+```
+Browser (MetaMask + Relayer SDK)      Smart Contract (Zama FHEVM)
+----------------------------------    ----------------------------------------
+bid -> encrypt -> handle/proof  --->  bid(handle, proof)
+                                      - import encrypted bid
+                                      - keep encrypted MIN with TFHE.lt/cmux
+                                      - mark sender as participated
+
+owner: closeBidding()                 // stop new bids
+owner: publishResults()               // expose min handle (publicDecrypt)
+                                      // seal per-user win flags (userDecrypt)
+
+user: getMyWinFlagHandle()            // handle(ebool) -> userDecrypt via EIP-712
+```
+
+### Frontend snippets
+
+**Encrypt & submit bid**
+
+```js
 const buf = relayer.createEncryptedInput(CONTRACT_ADDRESS, user);
 buf.add64(bid);
 const { handles, inputProof } = await buf.encrypt();
 await contract.bid(handles[0], inputProof);
+```
 
+**User decrypts win flag**
 
-User decrypts win flag
-
+```js
 const handle = await contract.getMyWinFlagHandle();
 const kp = await generateKeypair();
 
@@ -151,72 +181,79 @@ const out = await relayer.userDecrypt(
 );
 
 const isWinner = Number(BigInt(out[handle])) === 1;
+```
 
-⚠️ ABI sync note (important)
+---
 
-The sample index.html currently references:
+## ⚠️ ABI Sync Note (important)
 
-finalize() instead of publishResults()
+The provided `index.html` uses:
 
-resultsReady() instead of checking minPublished && winFlagsReady
+* `finalize()` (frontend) **vs** `publishResults()` (contract)
+* `resultsReady()` (frontend) **vs** `minPublished && winFlagsReady` (contract)
 
-Pick one of the following:
+Choose **one** path:
 
-Update the contract to match the frontend:
+* **Update the contract** to add shims:
 
-function finalize() external onlyOwner { publishResults(); }
-function resultsReady() external view returns (bool) { return minPublished && winFlagsReady; }
+  ```solidity
+  function finalize() external onlyOwner { publishResults(); }
+  function resultsReady() external view returns (bool) { return minPublished && winFlagsReady; }
+  ```
+* **OR update the frontend ABI** to call `publishResults()` and compute readiness as `minPublished && winFlagsReady`.
 
+If you hit `staticCall` reverts or “function not found”, this mismatch is likely the cause.
 
-OR
+---
 
-Update the frontend ABI & calls to use publishResults() and compute readiness as minPublished && winFlagsReady.
+## 🧪 Tips & Limits
 
-If you see staticCall reverts or “function not found”, this mismatch is the usual suspect.
+* Demo only; **not audited** for production/mainnet.
+* Bids are `euint64` (UI enforces `> 0`); **one bid per address**.
+* Relayer/KMS are testnet services; occasional downtime is possible.
+* WASM workers require **cross-origin isolation** → serve with COOP/COEP.
 
-🧪 Limits & notes
+---
 
-Demo only; not audited for production/mainnet.
+## 🧯 Troubleshooting
 
-Bids are euint64 (UI enforces > 0).
+* **`Relayer unavailable / 5xx`** → testnet hiccup; try later.
+* **`Please switch to Sepolia`** → switch/add network in MetaMask.
+* **`staticCall revert / wrong function`** → see **ABI Sync Note**.
+* **`SharedArrayBuffer` / COEP errors** → serve with proper COOP/COEP headers.
+* **`KMS contract not found`** → verify `KMS_ADDRESS` for Sepolia.
 
-One bid per address.
+---
 
-Relayer/KMS are testnet infra; occasional downtime can happen.
+## 📚 Useful Links
 
-Cross-origin isolation required for WASM workers (serve with COOP/COEP).
+* Zama FHEVM Docs: [https://docs.zama.ai/fhevm](https://docs.zama.ai/fhevm)
+* Solidity Guides (Relayer, decrypt flows, etc.): [https://docs.zama.ai/protocol/solidity-guides/](https://docs.zama.ai/protocol/solidity-guides/)
 
-🧯 Troubleshooting
+---
 
-Relayer unavailable / 5xx → testnet infra hiccup. Try later.
+## 🔒 Security
 
-Please switch to Sepolia → switch/add network in MetaMask.
+Do **not** commit private keys or mnemonics. Treat this repository as a learning/demo project unless formally audited.
 
-staticCall revert / wrong function → ABI mismatch (see ABI sync note).
+---
 
-SharedArrayBuffer / COEP errors → run behind a server that sets COOP/COEP headers.
+## 🗺️ Roadmap (ideas)
 
-KMS contract not found → verify KMS_ADDRESS for your network.
+* Multiple lots / deadlines / refunds
+* Off-chain winner notifications
+* Threshold admin actions (M-of-N)
+* Tie-breaking for equal minimums
 
-🔒 Security
+---
 
-Don’t commit private keys or mnemonic phrases.
+## 🙏 Acknowledgements
 
-Treat this as a learning/demo project until you complete a proper audit.
+* The Zama team & community for FHEVM 💚
+* Ethers.js and the broader Ethereum OSS ecosystem
 
-🗺️ Roadmap (ideas)
+---
 
-Multiple lots / deadlines / refunds.
+## 📄 License
 
-Off-chain notifications for winners.
-
-Threshold admin actions (M-of-N).
-
-Tie-breaking policies for equal minimums.
-
-🙏 Acknowledgements
-
-Zama FHEVM
- and the TFHE toolchain.
-
-Ethers.js and the broader Ethereum OSS community. 💚
+MIT — see [`LICENSE`](LICENSE).
